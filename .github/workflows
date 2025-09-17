@@ -1,0 +1,32 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+      - name: Copy files / sync to EC2
+        run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i ssh_key.pem" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/path/on/ec2/
+
+      - name: SSH into EC2 and restart service
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /path/on/ec2/
+            # e.g., pull changes, install dependencies, restart services
+            git pull origin main
+            npm install
+            pm2 restart all
+          EOF
